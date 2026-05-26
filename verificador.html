@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validador de Lote & Validade</title>
+    <!-- Tailwind CSS para interface responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tesseract.js para OCR no navegador -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800 font-sans">
+
+    <div class="max-w-md mx-auto p-4 space-y-6">
+        
+        <!-- Cabeçalho -->
+        <header class="text-center py-4">
+            <h1 class="text-2xl font-bold text-blue-600">Validador de Codificação</h1>
+            <p class="text-sm text-gray-500">Compare Fabricação, Lote e Validade por OCR</p>
+        </header>
+
+        <!-- PASSO 1: DADOS DE REFERÊNCIA (PADRÃO) -->
+        <section class="bg-white p-5 rounded-2xl shadow-md border border-gray-200">
+            <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                <span class="bg-blue-100 text-blue-600 px-2.5 py-1 rounded-full text-xs font-bold">1</span>
+                Dados de Referência (Padrão)
+            </h2>
+            
+            <!-- Tabs para alternar entre Manual e Scanner -->
+            <div class="flex border-b border-gray-200 mb-4">
+                <button onclick="switchRefTab('manual')" id="tab-manual" class="w-1/2 py-2 text-center text-sm font-medium border-b-2 border-blue-500 text-blue-600">
+                    Digitar Manual
+                </button>
+                <button onclick="switchRefTab('scan')" id="tab-scan" class="w-1/2 py-2 text-center text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    Escanear Imagem
+                </button>
+            </div>
+
+            <!-- Formulário Manual -->
+            <div id="ref-manual-container" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">DATA DE FABRICAÇÃO</label>
+                    <input type="text" id="ref-fab" placeholder="Ex: 26/05/2026" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">LOTE</label>
+                    <input type="text" id="ref-lote" placeholder="Ex: L1234AB" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">DATA DE VALIDADE</label>
+                    <input type="text" id="ref-val" placeholder="Ex: 26/05/2027" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+
+            <!-- Upload para Escanear Referência -->
+            <div id="ref-scan-container" class="hidden space-y-3">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">SELECIONE OU TIRE FOTO DO PADRÃO</label>
+                <input type="file" id="ref-file" accept="image/*" capture="environment" class="hidden" onchange="processImage('ref')">
+                <button onclick="document.getElementById('ref-file').click()" class="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span class="text-xs text-gray-500">Câmera ou Galeria</span>
+                </button>
+                <div id="ref-img-preview-container" class="hidden">
+                    <img id="ref-img-preview" class="w-full max-h-40 object-contain rounded-lg border">
+                </div>
+            </div>
+        </section>
+
+        <!-- PASSO 2: IMAGEM PARA ANÁLISE -->
+        <section class="bg-white p-5 rounded-2xl shadow-md border border-gray-200">
+            <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                <span class="bg-blue-100 text-blue-600 px-2.5 py-1 rounded-full text-xs font-bold">2</span>
+                Imagem para Verificação
+            </h2>
+            <div class="space-y-3">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">USE A CÂMERA DO CELULAR OU BUSQUE DA GALERIA</label>
+                <input type="file" id="target-file" accept="image/*" capture="environment" class="hidden" onchange="processImage('target')">
+                <button onclick="document.getElementById('target-file').click()" class="w-full py-6 border-2 border-dashed border-blue-300 rounded-xl flex flex-col items-center justify-center bg-blue-50/50 hover:bg-blue-50 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-blue-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span class="text-sm font-semibold text-blue-600">Escaneie o Produto</span>
+                    <span class="text-xs text-gray-400 mt-1">Câmera ou Arquivo</span>
+                </button>
+                <div id="target-img-preview-container" class="hidden">
+                    <img id="target-img-preview" class="w-full max-h-48 object-contain rounded-lg border">
+                </div>
+            </div>
+        </section>
+
+        <!-- LOADING SPINNER -->
+        <div id="loading" class="hidden text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-2"></div>
+            <p class="text-sm text-gray-600" id="loading-text">Processando OCR na imagem...</p>
+        </div>
+
+        <!-- PAINEL DE RESULTADOS -->
+        <section id="result-section" class="hidden bg-white p-5 rounded-2xl shadow-md border border-gray-200 space-y-4">
+            <h2 class="text-lg font-semibold border-b pb-2">Resultado da Comparação</h2>
+            
+            <!-- Badge Status Geral -->
+            <div id="status-badge" class="p-4 rounded-xl text-center text-xl font-bold uppercase tracking-wider">
+                Status
+            </div>
+
+            <!-- Tabela de Comparação -->
+            <div class="space-y-3 text-sm">
+                <div class="grid grid-cols-3 font-semibold text-gray-500 border-b pb-1 text-xs">
+                    <div>CAMPO</div>
+                    <div>REFERÊNCIA</div>
+                    <div>LIDO</div>
+                </div>
+                <div class="grid grid-cols-3 items-center py-1 border-b" id="row-fab">
+                    <span class="font-medium text-gray-700">Fabricação</span>
+                    <span id="res-ref-fab" class="text-gray-600">-</span>
+                    <span id="res-read-fab" class="font-bold text-gray-900">-</span>
+                </div>
+                <div class="grid grid-cols-3 items-center py-1 border-b" id="row-lote">
+                    <span class="font-medium text-gray-700">Lote</span>
+                    <span id="res-ref-lote" class="text-gray-600">-</span>
+                    <span id="res-read-lote" class="font-bold text-gray-900">-</span>
+                </div>
+                <div class="grid grid-cols-3 items-center py-1" id="row-val">
+                    <span class="font-medium text-gray-700">Validade</span>
+                    <span id="res-ref-val" class="text-gray-600">-</span>
+                    <span id="res-read-val" class="font-bold text-gray-900">-</span>
+                </div>
+            </div>
+
+            <!-- Alertas de Falhas de Codificação -->
+            <div id="alert-box" class="hidden p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-xs text-yellow-700 space-y-1">
+                <p class="font-semibold text-sm mb-1">🔍 Diagnóstico de Codificação:</p>
+                <ul id="alert-list" class="list-disc list-inside space-y-1"></ul>
+            </div>
+            
+            <!-- Texto bruto extraído para auditoria manual -->
+            <div class="text-xs text-gray-400 bg-gray-50 p-2 rounded border">
+                <p class="font-semibold mb-1 text-gray-500">Texto bruto capturado no produto:</p>
+                <span id="raw-scanned-text" class="italic">Nenhum</span>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        let currentTab = 'manual';
+        let ocrRefData = null;
+
+        function switchRefTab(tab) {
+            currentTab = tab;
+            const btnManual = document.getElementById('tab-manual');
+            const btnScan = document.getElementById('tab-scan');
+            const manualContainer = document.getElementById('ref-manual-container');
+            const scanContainer = document.getElementById('ref-scan-container');
+
+            if (tab === 'manual') {
+                btnManual.className = "w-1/2 py-2 text-center text-sm font-medium border-b-2 border-blue-500 text-blue-600";
+                btnScan.className = "w-1/2 py-2 text-center text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700";
+                manualContainer.classList.remove('hidden');
+                scanContainer.classList.add('hidden');
+            } else {
+                btnScan.className = "w-1/2 py-2 text-center text-sm font-medium border-b-2 border-blue-500 text-blue-600";
+                btnManual.className = "w-1/2 py-2 text-center text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700";
+                scanContainer.classList.remove('hidden');
+                manualContainer.classList.add('hidden');
+            }
+        }
+
+        // Função principal de OCR usando Tesseract.js
+        async function processImage(type) {
+            const fileInput = document.getElementById(`${type}-file`);
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            // Mostrar Preview da imagem
+            const previewContainer = document.getElementById(`${type}-img-preview-container`);
+            const previewImg = document.getElementById(`${type}-img-preview`);
+            previewImg.src = URL.createObjectURL(file);
+            previewContainer.classList.remove('hidden');
+
+            // Mostrar Loading
+            const loading = document.getElementById('loading');
+            const loadingText = document.getElementById('loading-text');
+            loading.classList.remove('hidden');
+            loadingText.innerText = "Lendo caracteres da imagem (OCR)...";
+            document.getElementById('result-section').classList.add('hidden');
+
+            try {
+                // Inicializa o Tesseract para ler em Português e Inglês (melhor compatibilidade com códigos mistos)
+                const worker = await Tesseract.createWorker('por+eng');
+                const result = await worker.recognize(file);
+                const rawText = result.data.text;
+                const confidence = result.data.confidence;
+                await worker.terminate();
+
+                const parsed = parseOCRData(rawText);
+                parsed.confidence = confidence;
+
+                if (type === 'ref') {
+                    // Preenche campos de referência automaticamente caso seja scan padrão
+                    document.getElementById('ref-fab').value = parsed.fab || '';
+                    document.getElementById('ref-lote').value = parsed.lote || '';
+                    document.getElementById('ref-val').value = parsed.val || '';
+                    alert("Dados de referência extraídos e preenchidos!");
+                } else {
+                    // Se for imagem de análise, executa a comparação imediata
+                    compareData(parsed);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao ler a imagem. Tente novamente com mais foco/luz.");
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        // Regex para capturar datas de fabricação, validade e lotes
+        function parseOCRData(text) {
+            const lines = text.toUpperCase().split('\n');
+            let fab = '';
+            let val = '';
+            let lote = '';
+
+            // Padrões comuns de datas: DD/MM/AAAA, DD/MM/AA, MM/AAAA
+            const dateRegex = /\b\d{2}[\/\.\-]\d{2}[\/\.\-]\d{2,4}\b|\b\d{2}[\/\.\-]\d{4}\b/g;
+
+            lines.forEach(line => {
+                // Procurar por indicações de Lote
+                if (line.includes('LOT') || line.includes('L:') || line.startsWith('L ')) {
+                    const cleanLine = line.replace(/[^A-Z0-9\-\:\s]/g, '');
+                    const loteMatch = cleanLine.match(/(?:LOTE|LOT|L\:|L)\s*([A-Z0-9\-]+)/);
+                    if (loteMatch && loteMatch[1]) {
+                        lote = loteMatch[1].trim();
+                    }
+                }
+                
+                // Procurar por Fabricação / Validade
+                const datesInLine = line.match(dateRegex);
+                if (datesInLine) {
+                    if (line.includes('FAB') || line.includes('F:') || line.includes('MGF')) {
+                        fab = datesInLine[0];
+                    } else if (line.includes('VAL') || line.includes('V:') || line.includes('EXP') || line.includes('VENC')) {
+                        val = datesInLine[0];
+                    } else {
+                        // Atribuição sequencial padrão se não achar palavras chaves claras
+                        if (!fab) fab = datesInLine[0];
+                        else if (!val) val = datesInLine[0];
+                    }
+                }
+            });
+
+            // Se as regex estritas falharem, busca qualquer lote aproximado no texto
+            if (!lote) {
+                const genericLoteMatch = text.match(/\b[A-Z0-9]{5,10}\b/i);
+                if (genericLoteMatch) lote = genericLoteMatch[0];
+            }
+
+            return { fab, val, lote, rawText: text };
+        }
+
+        // Calcula a distância para checar se faltam dígitos ou se há semelhanças (Borrões)
+        function levenshteinDistance(str1 = '', str2 = '') {
+            const track = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+            for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
+            for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+            for (let j = 1; j <= str2.length; j += 1) {
+                for (let i = 1; i <= str1.length; i += 1) {
+                    const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                    track[j][i] = Math.min(
+                        track[j][i - 1] + 1, // deletado
+                        track[j - 1][i] + 1, // inserido
+                        track[j - 1][i - 1] + indicator // trocado
+                    );
+                }
+            }
+            return track[str2.length][str1.length];
+        }
+
+        // Comparador principal
+        function compareData(scanned) {
+            const refFab = document.getElementById('ref-fab').value.trim().toUpperCase();
+            const refLote = document.getElementById('ref-lote').value.trim().toUpperCase();
+            const refVal = document.getElementById('ref-val').value.trim().toUpperCase();
+
+            // Elementos de tela para atualização
+            document.getElementById('res-ref-fab').innerText = refFab || '[Não Definido]';
+            document.getElementById('res-ref-lote').innerText = refLote || '[Não Definido]';
+            document.getElementById('res-ref-val').innerText = refVal || '[Não Definido]';
+
+            document.getElementById('res-read-fab').innerText = scanned.fab || '[Não detectado]';
+            document.getElementById('res-read-lote').innerText = scanned.lote || '[Não detectado]';
+            document.getElementById('res-read-val').innerText = scanned.val || '[Não detectado]';
+            document.getElementById('raw-scanned-text').innerText = scanned.rawText.replace(/\n/g, ' | ') || 'Em branco';
+
+            let approved = true;
+            const alerts = [];
+
+            // 1. Validação de Fabricação
+            if (refFab !== scanned.fab) {
+                approved = false;
+                const distance = levenshteinDistance(refFab, scanned.fab);
+                if (scanned.fab === '') {
+                    alerts.push("Fabricação: Não identificada na embalagem (possível borrão severo ou rasura).");
+                } else if (distance <= 2) {
+                    alerts.push(`Fabricação: Erro leve detectado (Lido: "${scanned.fab}"). Possível falha de impressão ou caractere borrado.`);
+                } else {
+                    alerts.push(`Fabricação: Divergência crítica.`);
+                }
+            }
+
+            // 2. Validação de Lote
+            if (refLote !== scanned.lote) {
+                approved = false;
+                const distance = levenshteinDistance(refLote, scanned.lote);
+                if (scanned.lote === '') {
+                    alerts.push("Lote: Falha total de leitura no código de lote.");
+                } else if (scanned.lote.length < refLote.length) {
+                    alerts.push(`Lote: Código mais curto que o esperado. Caractere ou dígito ausente detectado (Lido: "${scanned.lote}").`);
+                } else if (distance <= 2) {
+                    alerts.push(`Lote: Diferença mínima detectada (Lido: "${scanned.lote}"). Possível caractere borrado/ilegível.`);
+                } else {
+                    alerts.push(`Lote: Divergência total de lote.`);
+                }
+            }
+
+            // 3. Validação de Validade
+            if (refVal !== scanned.val) {
+                approved = false;
+                const distance = levenshteinDistance(refVal, scanned.val);
+                if (scanned.val === '') {
+                    alerts.push("Validade: Não localizada no produto.");
+                } else if (distance <= 2) {
+                    alerts.push(`Validade: Divergência ou leitura imprecisa (Lido: "${scanned.val}"). Verifique se há caracteres borrados.`);
+                } else {
+                    alerts.push(`Validade: Divergência crítica.`);
+                }
+            }
+
+            // 4. Análise Geral de Qualidade da Imagem (Confiança do Tesseract)
+            if (scanned.confidence < 72) {
+                alerts.push(`Geral: Baixo índice de nitidez na captura (${scanned.confidence}% de certeza). A embalagem pode estar excessivamente borrada, suja ou curvada.`);
+            }
+
+            // 5. Verificação de caracteres especiais estranhos gerados por OCR instável
+            const irregularChars = /[\?\~\*\_\|\§]/;
+            if (irregularChars.test(scanned.rawText)) {
+                alerts.push("Geral: Detectados caracteres estranhos (Ex: ?, ~, _, |). Isto aponta para codificação física danificada ou borrada.");
+            }
+
+            // Exibir Status Final
+            const statusBadge = document.getElementById('status-badge');
+            const alertBox = document.getElementById('alert-box');
+            const alertList = document.getElementById('alert-list');
+
+            alertList.innerHTML = '';
+
+            if (approved) {
+                statusBadge.className = "p-4 rounded-xl text-center text-xl font-bold uppercase tracking-wider bg-green-100 text-green-700 border-2 border-green-500";
+                statusBadge.innerHTML = "✅ Aprovado";
+                alertBox.classList.add('hidden');
+            } else {
+                statusBadge.className = "p-4 rounded-xl text-center text-xl font-bold uppercase tracking-wider bg-red-100 text-red-700 border-2 border-red-500";
+                statusBadge.innerHTML = "❌ Reprovado";
+                
+                alerts.forEach(alertText => {
+                    const li = document.createElement('li');
+                    li.innerText = alertText;
+                    alertList.appendChild(li);
+                });
+                alertBox.classList.remove('hidden');
+            }
+
+            document.getElementById('result-section').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
